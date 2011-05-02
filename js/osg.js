@@ -2959,7 +2959,7 @@ osg.Node.prototype = {
             }
         }
     },
-    setNodeMask: function(mask) { this.nodeMask = mask; }, 
+    setNodeMask: function(mask) { this.nodeMask = mask; },
     getNodeMask: function(mask) { return this.nodeMask; },
     setStateSet: function(s) { this.stateset = s; },
     setUpdateCallback: function(cb) { this.updateCallback = cb; },

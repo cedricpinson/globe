@@ -88,7 +88,9 @@ var Globe = function(canvas, options)
             render();
         };
 
-        this.viewer.setScene(this.createScene());
+        var result = this.createScene();
+        this.items = result.items;
+        this.viewer.setScene(result.root);
         this.viewer.run();
     } catch (er) {
         osg.log("exception in osgViewer " + er);
@@ -97,6 +99,54 @@ var Globe = function(canvas, options)
 };
 
 Globe.prototype = {
+    addImage: function(latitude, longitude, image, options, cb) {
+        var texture = new osg.Texture();
+        texture.setMinFilter('LINEAR');
+        texture.setImage(image);
+
+        var w = 500000;
+        var h = 500000;
+        var node = new osg.MatrixTransform();
+        var geom = osg.createTexturedQuad(-w/2.0, -h/2.0, 0,
+                                          w, 0, 0,
+                                          0, h, 0);
+        node.addChild(geom);
+        var stateSet = this.getItemShader();
+        stateSet.setTextureAttributeAndMode(0, texture);
+
+        var uniform = osg.Uniform.createInt1(0.0, "Texture0");
+        geom.setStateSet(stateSet);
+        node.uniform = stateSet.getUniformMap()['fragColor'];
+        node.setUpdateCallback(this.getItemUpdateCallback());
+        node.itemType = "Item";
+
+        if (this.ellipsoidModel === undefined) {
+            this.ellipsoidModel = new osg.EllipsoidModel();
+        }
+
+        var matrix = this.ellipsoidModel.computeLocalToWorldTransformFromLatLongHeight(latitude * Math.PI/180.0, longitude * Math.PI/180.0, 1000);
+        node.originalMatrix = osg.Matrix.copy(matrix);
+        node.setMatrix(matrix);
+        
+        node.name = image.src;
+
+        node.setNodeMask(~0);
+        node.itemToIntersect = true;
+        delete node.startTime;
+        delete node.duration;
+
+        // add the node to the sceneGraph
+        this.items.addChild(node);
+    },
+    dispose: function() {
+        
+        for (var i = 0, l = this.items.getChildren().length, children = this.items.getChildren(); i < l; i++) {
+            var child = children[i];
+            child.updateCallback = undefined;
+            child.removeChildren();
+        }
+        this.items.removeChildren();
+    },
     getWindowSize: function() {
         var myWidth = 0, myHeight = 0;
         
@@ -208,6 +258,111 @@ Globe.prototype = {
         return stateset;
     },
 
+    getItemUpdateCallback: function() {
+        var that = this;
+        if (this.itemUpdateCallback === undefined) {
+            var UpdateCallback = function() {
+                this.limit = osg.WGS_84_RADIUS_EQUATOR*0.5;
+                this.manipulator = that.viewer.getManipulator();
+            };
+            UpdateCallback.prototype = {
+                update: function(node, nv) {
+                    var ratio = 0;
+                    var currentTime = nv.getFrameStamp().getSimulationTime();
+                    if (node.startTime === undefined) {
+                        node.startTime = currentTime;
+                        if (node.duration === undefined) {
+                            node.duration = 500.0;
+                        }
+                    }
+
+                    var dt = currentTime - node.startTime;
+                    if (dt > node.duration) {
+                        node.setNodeMask(0);
+                        return;
+                    }
+                    ratio = dt/node.duration;
+                    if (node.originalMatrix) {
+                        var scale;
+                        if (dt > 1.0) {
+                            scale = 1.0;
+                        } else {
+                            scale = osgAnimation.EaseOutElastic(dt);
+                        }
+
+                        scale = scale * (this.manipulator.height/osg.WGS_84_RADIUS_EQUATOR);
+                        if (this.manipulator.height > this.limit) {
+                            var rr = 1.0 - (this.manipulator.height-this.limit) * 0.8/(2.5*osg.WGS_84_RADIUS_EQUATOR-this.limit);
+                            scale *= rr;
+                        }
+                        node.setMatrix(osg.Matrix.mult(node.originalMatrix, osg.Matrix.makeScale(scale, scale, scale)));
+                    }
+
+                    var value = (1.0 - osgAnimation.EaseInQuad(ratio));
+                    var uniform = node.uniform;
+                    var c = [value, value, value, value];
+                    uniform.set(c);
+                    node.traverse(nv);
+                }
+            };
+            this.itemUpdateCallback = new UpdateCallback();
+        }
+        return this.itemUpdateCallback;
+    },
+    getItemShader: function() {
+        if (this.ItemShader === undefined) {
+            var vertexshader = [
+                "",
+                "#ifdef GL_ES",
+                "precision highp float;",
+                "#endif",
+                "attribute vec3 Vertex;",
+                "attribute vec2 TexCoord0;",
+                "uniform mat4 ModelViewMatrix;",
+                "uniform mat4 ProjectionMatrix;",
+                "varying vec2 FragTexCoord0;",
+                "void main(void) {",
+                "  gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Vertex,1.0);",
+                "  FragTexCoord0 = TexCoord0;",
+                "}",
+                ""
+            ].join('\n');
+
+            var fragmentshader = [
+                "",
+                "#ifdef GL_ES",
+                "precision highp float;",
+                "#endif",
+                "uniform vec4 fragColor;",
+                "uniform sampler2D Texture0;",
+                "varying vec2 FragTexCoord0;",
+                "void main(void) {",
+                "vec4 color = texture2D( Texture0, FragTexCoord0.xy);",
+                "float a = color[3];",
+                "color = color*a;",
+                "color[3]= a;",
+                "gl_FragColor = color*fragColor[0];",
+                "}",
+                ""
+            ].join('\n');
+
+            var program = osg.Program.create(
+                osg.Shader.create(gl.VERTEX_SHADER, vertexshader),
+                osg.Shader.create(gl.FRAGMENT_SHADER, fragmentshader));
+
+            this.ItemShader = program;
+        }
+        var stateset = new osg.StateSet();
+        var uniform = osg.Uniform.createFloat4([1.0,
+                                                0.0,
+                                                1.0,
+                                                0.5],"fragColor");
+        stateset.setAttributeAndMode(this.ItemShader);
+        //stateset.setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
+        stateset.addUniform(uniform);
+        return stateset;
+    },
+
     createScene: function() {
         var viewer = this.viewer;
 
@@ -256,6 +411,10 @@ Globe.prototype = {
         scene.addChild(backSphere);
         scene.addChild(frontSphere);
         scene.addChild(country);
+        var items = new osg.Node();
+        scene.addChild(items);
+        items.getOrCreateStateSet().setAttributeAndMode(new osg.Depth('DISABLE'));
+        items.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
 
         backSphere.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
         frontSphere.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
@@ -273,7 +432,7 @@ Globe.prototype = {
 
         viewer.manipulator.update(-2.0, 0);
 
-        return scene;
+        return { root: scene, items: items};
     }
 };
 

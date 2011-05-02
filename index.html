@@ -24,12 +24,25 @@ window.addEventListener("load", function() {
        globeBackColor: "#333333FF",
        globeFrontColor: "#888888aa",
        globeLinesColor: "#000000FF",
-       width:800,
-       height:600,
+
+       width:1920,
+       height:996,
+
        rotationSpeedFactor: 1.5
     };
 
     var globe = new Globe(document.getElementById("3DView"),options);
+
+    var img = new Image();
+    img.onload = function() {
+       globe.addImage(48.8566667, 2.3509871, img);
+       window.setTimeout(function() {
+            globe.dispose();
+          }, 10000); 
+    };
+    img.src = "item.png";
+
+
 },true);
 
 </script>
@@ -38,7 +51,7 @@ window.addEventListener("load", function() {
 <body>
 
 <div id="ViewContainer">
-<canvas id="3DView"></canvas>
+<canvas id="3DView" width="800" height="600"></canvas>
 </div>
 </div>
 
