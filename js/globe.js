@@ -28,6 +28,9 @@ var Globe = function(canvas, options)
     this.countryColor = hex2num("#000000FF"); //[0.0,0.0,0.0,1];
 
 
+    var w,h;
+    w = canvas.width;
+    h = canvas.height;
     if (options !== undefined) {
         if (options.globeBackColor !== undefined) {
             this.landColor = hex2num(options.globeBackColor);
@@ -40,19 +43,33 @@ var Globe = function(canvas, options)
         if (options.globeLinesColor !== undefined) {
             this.countryColor = hex2num(options.globeLinesColor);
         }
+
+        if (options.width !== undefined) {
+            w = options.width;
+        }
+        if (options.height !== undefined) {
+            h = options.height;
+        }
     }
 
+    
+    if (w === undefined || h === undefined) {
+        var size = this.getWindowSize();
+        w = size.w;
+        h = size.h;
+    }
 
-    var size = this.getWindowSize();
     this.canvas = canvas;
-    canvas.width = size.w;
-    canvas.height = size.h;
+    canvas.width = w;
+    canvas.height = h;
     var ratio = canvas.width/canvas.height;
 
     try {
         this.viewer = new osgViewer.Viewer(canvas);
         this.viewer.init();
-        this.viewer.setupManipulator(new osgGA.OrbitManipulator2());
+        var manipulator = new osgGA.OrbitManipulator2(options);
+        this.viewer.setupManipulator(manipulator);
+
         this.viewer.view.setProjectionMatrix(osg.Matrix.makePerspective(60, ratio, 1000.0, 100000000.0));
         this.viewer.manipulator.setDistance(2.5*6378137);
         this.viewer.manipulator.setMaxDistance(2.5*6378137);
@@ -261,7 +278,7 @@ Globe.prototype = {
 };
 
 
-osgGA.OrbitManipulator2 = function () {
+osgGA.OrbitManipulator2 = function (options) {
     this.ellipsoidModel = new osg.EllipsoidModel();
     this.distance = 25;
     this.target = [ 0,0, 0];
@@ -295,6 +312,13 @@ osgGA.OrbitManipulator2 = function () {
     this.contacts = [];
     this.contactsPosition = [];
     this.zoomModeUsed = false;
+
+    this.scaleFactor = 10.0;
+    if (options !== undefined && options.rotationSpeedFactor !== undefined) {
+        if (options.rotationSpeedFactor !== 0.0) {
+            this.scaleFactor /= options.rotationSpeedFactor;
+        }
+    }
 };
 
 osgGA.OrbitManipulator2.prototype = {
@@ -453,7 +477,6 @@ osgGA.OrbitManipulator2.prototype = {
             return;
         }
 
-        var scaleFactor;
         var curX;
         var curY;
         var deltaX;
@@ -462,9 +485,8 @@ osgGA.OrbitManipulator2.prototype = {
         curX = pos[0];
         curY = pos[1];
 
-        scaleFactor = 10.0;
-        deltaX = (this.clientX - curX) / scaleFactor;
-        deltaY = (this.clientY - curY) / scaleFactor;
+        deltaX = (this.clientX - curX) / this.scaleFactor;
+        deltaY = (this.clientY - curY) / this.scaleFactor;
         this.clientX = curX;
         this.clientY = curY;
 
