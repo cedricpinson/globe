@@ -2985,8 +2985,7 @@ osg.Node.prototype = {
         this.parents.push(parent);
     },
     removeParent: function(parent) {
-        var parents = this.parents;
-        for (var i = 0, l = this.parents.length; i < l; i++) {
+        for (var i = 0, l = this.parents.length, parents = this.parents; i < l; i++) {
             if (parents[i] === parent) {
                 parents.splice(i, 1);
                 return;

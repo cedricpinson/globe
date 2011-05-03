@@ -137,15 +137,20 @@ Globe.prototype = {
 
         // add the node to the sceneGraph
         this.items.addChild(node);
+
+        node.dispose = function() {
+            this.updateCallback = undefined;
+            this.removeChildren();
+            while(this.parents.length > 0) {
+                this.parents[0].removeChildren(this);
+            }
+        };
+        return node;
     },
     dispose: function() {
-        
-        for (var i = 0, l = this.items.getChildren().length, children = this.items.getChildren(); i < l; i++) {
-            var child = children[i];
-            child.updateCallback = undefined;
-            child.removeChildren();
+        while (this.items.getChildren().length > 0 ) {
+            this.items.getChildren()[0].dispose();
         }
-        this.items.removeChildren();
     },
     getWindowSize: function() {
         var myWidth = 0, myHeight = 0;
@@ -272,7 +277,7 @@ Globe.prototype = {
                     if (node.startTime === undefined) {
                         node.startTime = currentTime;
                         if (node.duration === undefined) {
-                            node.duration = 500.0;
+                            node.duration = 5.0;
                         }
                     }
 
@@ -478,6 +483,14 @@ osgGA.OrbitManipulator2 = function (options) {
             this.scaleFactor /= options.rotationSpeedFactor;
         }
     }
+
+    this.minAutomaticMotion = 0.015;
+    if (options !== undefined && options.rotationIdleSpeedFactor !== undefined) {
+        if (options.rotationIdleSpeedFactor !== 0.0) {
+            this.minAutomaticMotion *= options.rotationIdleSpeedFactor;
+        }
+    }
+
 };
 
 osgGA.OrbitManipulator2.prototype = {
@@ -580,7 +593,7 @@ osgGA.OrbitManipulator2.prototype = {
             dx *= f;
             dy *= f;
 
-            var min = 0.015;
+            var min = this.minAutomaticMotion;
             if (Math.abs(dx) < min) {
                 dx = min*this.direction * this.motionWhenRelease;
                 this.dx = dx;
@@ -599,7 +612,7 @@ osgGA.OrbitManipulator2.prototype = {
     },
 
     disableAutomaticMotion: function(duration) {
-        var min = 0.015;
+        var min = this.minAutomaticMotion;
         this.motionWhenRelease = 0.0;
         if (this.timeout === undefined) {
             var that = this;

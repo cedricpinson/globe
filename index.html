@@ -28,20 +28,50 @@ window.addEventListener("load", function() {
        width:1920,
        height:996,
 
+       rotationIdleSpeedFactor: 10.0,
        rotationSpeedFactor: 1.5
     };
 
     var globe = new Globe(document.getElementById("3DView"),options);
 
     var img = new Image();
+    var items = [];
     img.onload = function() {
+
+       # basic test usage
        globe.addImage(48.8566667, 2.3509871, img);
-       window.setTimeout(function() {
-            globe.dispose();
-          }, 10000); 
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+
+       // check it's in the tree
+       if (globe.items.children.length !== 7) {
+          alert("Should be 7, and is " + globe.items.children.length);
+       }
+       globe.dispose();
+       if (globe.items.children.length !== 0) {
+          alert("Should be 0, and is " + globe.items.children.length);
+       }
+
+       items.push(globe.addImage(48.8566667, 2.3509871, img));
+       // check it's in the tree
+       if (globe.items.children.length !== 1) {
+          alert("Should be 1, and is " + globe.items.children.length);
+       }
+       items[0].dispose();
+       // check it's not in the tree
+       if (globe.items.children.length !== 0) {
+          alert("Should be 0, and is " + globe.items.children.length);
+       }
     };
     img.src = "item.png";
 
+    window.setInterval(function() {
+          globe.addImage(48.8566667, 2.3509871, img);
+       }, 5000);
 
 },true);
 
