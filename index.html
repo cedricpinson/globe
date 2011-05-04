@@ -72,7 +72,7 @@ window.addEventListener("load", function() {
     img.src = "item.png";
 
     window.setInterval(function() {
-          globe.addImage(48.8566667, 2.3509871, img);
+          globe.addImage(48.8566667, 2.3509871, img, { color: [ 1.0, 0.2, 1.0, 0.4] }, function() { osg.log("Hit itemID " + this.itemID ); } );
        }, 5000);
 
 },true);

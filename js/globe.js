@@ -75,7 +75,7 @@ var Globe = function(canvas, options)
     try {
         this.viewer = new osgViewer.Viewer(canvas);
         this.viewer.init();
-        var manipulator = new osgGA.OrbitManipulator2(options);
+        var manipulator = new osgGA.GlobeManipulator(options);
         this.viewer.setupManipulator(manipulator);
 
         this.viewer.view.setProjectionMatrix(osg.Matrix.makePerspective(60, ratio, 1000.0, 100000000.0));
@@ -347,6 +347,13 @@ Globe.prototype = {
         return this.wave;
     },
     addImage: function(latitude, longitude, image, options, cb) {
+
+        // manage a uniq id for item created
+        if (this.itemID === undefined) {
+            this.itemID = 0;
+        }
+        this.itemID += 1;
+
         var texture = new osg.Texture();
         texture.setMinFilter('LINEAR');
         texture.setImage(image);
@@ -364,8 +371,16 @@ Globe.prototype = {
         var uniform = osg.Uniform.createInt1(0.0, "Texture0");
         geom.setStateSet(stateSet);
         node.uniform = stateSet.getUniformMap()['fragColor'];
+
         node.setUpdateCallback(this.getItemUpdateCallback());
         node.itemType = "Item";
+
+        if (options !== undefined) {
+            if (options.color !== undefined) {
+                var baseColor = stateSet.getUniformMap()['baseColor'];
+                baseColor.set(options.color);
+            }
+        }
 
         if (this.ellipsoidModel === undefined) {
             this.ellipsoidModel = new osg.EllipsoidModel();
@@ -380,7 +395,9 @@ Globe.prototype = {
         node.name = image.src;
 
         node.setNodeMask(~0);
+        node.itemID = this.itemID;
         node.itemToIntersect = true;
+        node.hitCallback = cb;
         delete node.startTime;
         delete node.duration;
 
@@ -593,6 +610,7 @@ Globe.prototype = {
                 "precision highp float;",
                 "#endif",
                 "uniform vec4 fragColor;",
+                "uniform vec4 baseColor;",
                 "uniform sampler2D Texture0;",
                 "varying vec2 FragTexCoord0;",
                 "void main(void) {",
@@ -600,7 +618,7 @@ Globe.prototype = {
                 "float a = color[3];",
                 "color = color*a;",
                 "color[3]= a;",
-                "gl_FragColor = color*fragColor[0];",
+                "gl_FragColor = (baseColor*color)*fragColor[0];",
                 "}",
                 ""
             ].join('\n');
@@ -616,9 +634,14 @@ Globe.prototype = {
                                                 0.0,
                                                 1.0,
                                                 0.5],"fragColor");
+        var baseColor = osg.Uniform.createFloat4([1.0,
+                                                  1.0,
+                                                  1.0,
+                                                  1.0],"baseColor");
         stateset.setAttributeAndMode(this.ItemShader);
         //stateset.setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
         stateset.addUniform(uniform);
+        stateset.addUniform(baseColor);
         return stateset;
     },
 
@@ -748,7 +771,7 @@ Globe.prototype = {
 };
 
 
-osgGA.OrbitManipulator2 = function (options) {
+osgGA.GlobeManipulator = function (options) {
     this.ellipsoidModel = new osg.EllipsoidModel();
     this.distance = 25;
     this.target = [ 0,0, 0];
@@ -799,7 +822,7 @@ osgGA.OrbitManipulator2 = function (options) {
 
 };
 
-osgGA.OrbitManipulator2.prototype = {
+osgGA.GlobeManipulator.prototype = {
     panModel: function(dx, dy) {
 
         var inv = osg.Matrix.inverse(this.rotation);
@@ -945,6 +968,15 @@ osgGA.OrbitManipulator2.prototype = {
             this.dx = this.lastDeltaX;
             this.dy = this.lastDeltaY;
             this.motionWhenRelease = 1.0;
+        }
+
+        if (this.pushHit !== undefined) {
+            var hit = this.getIntersection();
+            if (hit !== undefined) {
+                if (hit.itemID === this.pushHit.itemID && hit.item.hitCallback !== undefined) {
+                    hit.item.hitCallback();
+                }
+            }
         }
 
         //osg.log(this.dx + " " + this.dy);
@@ -1117,8 +1149,8 @@ osgGA.OrbitManipulator2.prototype = {
         this.dx = this.dy = 0;
         this.buttonup = false;
 
-        //var hit = this.getIntersection();
-        //this.pushHit = hit;
+        var hit = this.getIntersection();
+        this.pushHit = hit;
     },
 
     getIntersection: function() {
@@ -1135,16 +1167,16 @@ osgGA.OrbitManipulator2.prototype = {
         var hit = hits[0].nodepath;
         var l2 = hit.length;
         var itemSelected;
-        var name;
+        var itemID;
         while (l2-- >= 0) {
             if (hit[l2].itemToIntersect !== undefined) {
-                name = hit[l2].getName();
+                itemID = hit[l2].itemID;
                 //itemSelected = hit[l2].children[0].getUpdateCallback();
                 itemSelected = hit[l2];
                 break;
             }
         }
-        return { 'name': name, 
+        return { 'itemID': itemID, 
                  'item': itemSelected };
     },
 
