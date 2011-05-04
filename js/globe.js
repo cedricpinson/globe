@@ -26,7 +26,7 @@ var Globe = function(canvas, options)
     this.landFrontColor = hex2num("#7ABA7AAA"); //[122.0/255.0, 0.6470588235294118,0.7647058823529411,0.8666666666666667];
 
     this.countryColor = hex2num("#000000FF"); //[0.0,0.0,0.0,1];
-
+    this.waveColor = hex2num("#000000FF");
 
     var w,h;
     w = canvas.width;
@@ -42,6 +42,14 @@ var Globe = function(canvas, options)
 
         if (options.globeLinesColor !== undefined) {
             this.countryColor = hex2num(options.globeLinesColor);
+        }
+
+        if (options.waveColor !== undefined) {
+            this.waveColor = hex2num(options.waveColor);
+        }
+
+        if (options.wave === true) {
+            this.wave = this.getWave();
         }
 
         if (options.width !== undefined) {
@@ -99,6 +107,245 @@ var Globe = function(canvas, options)
 };
 
 Globe.prototype = {
+    getWaveShaderVolume: function() {
+        var vertexshader = [
+            "",
+            "#ifdef GL_ES",
+            "precision highp float;",
+            "#endif",
+            "attribute vec3 Vertex;",
+            "attribute vec3 TexCoord0;",
+            "uniform mat4 ModelViewMatrix;",
+            "uniform mat4 ProjectionMatrix;",
+            "uniform mat4 NormalMatrix;",
+            "uniform float scale;",
+            "uniform sampler2D Texture0;",
+            "varying float height;",
+            "float maxHeight = 1400000.0;",
+            "void main(void) {",
+            "  vec4 color = texture2D( Texture0, TexCoord0.xy);",
+            "  height = color[0];",
+            "  vec3 normal = normalize(Vertex);",
+            "  vec3 normalTransformed = vec3(NormalMatrix * vec4(normal,0.0));",
+            "  float dotComputed = dot(normalTransformed, vec3(0,0,1));",
+            "  height *= max(0.0, dotComputed);",
+            "  gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Vertex +  normal * ( height * maxHeight * scale),1.0);",
+            "  height *= 5.0 * scale;",
+            "}",
+            ""
+        ].join('\n');
+
+        var fragmentshader = [
+            "",
+            "#ifdef GL_ES",
+            "precision highp float;",
+            "#endif",
+            "uniform vec4 fragColor;",
+            "varying float height;",
+            "void main(void) {",
+            "gl_FragColor = fragColor * height;",
+            "}",
+            ""
+        ].join('\n');
+
+        var program = osg.Program.create(
+            osg.Shader.create(gl.VERTEX_SHADER, vertexshader),
+            osg.Shader.create(gl.FRAGMENT_SHADER, fragmentshader));
+        var stateset = new osg.StateSet();
+        var uniform = osg.Uniform.createFloat4(this.waveColor,"fragColor");
+        var scale = osg.Uniform.createFloat1(scale,"scale");
+        var uniformTexture = osg.Uniform.createInt1(0, "Texture0");
+        stateset.setAttributeAndMode(program);
+        stateset.setAttributeAndMode(new osg.LineWidth(1.0));
+        stateset.addUniform(uniform);
+        stateset.addUniform(uniformTexture);
+        stateset.addUniform(scale);
+        return stateset;
+    },
+    getWaveShaderFlat: function() {
+        var vertexshader = [
+            "",
+            "#ifdef GL_ES",
+            "precision highp float;",
+            "#endif",
+            "attribute vec3 Vertex;",
+            "attribute vec3 TexCoord0;",
+            "uniform mat4 ModelViewMatrix;",
+            "uniform mat4 ProjectionMatrix;",
+            "uniform mat4 NormalMatrix;",
+            "varying float dotComputed;",
+            "varying vec2 TexCoordFragment;",
+            "void main(void) {",
+            "  TexCoordFragment = TexCoord0.xy;",
+            "  vec3 normal = normalize(Vertex);",
+            "  vec3 normalTransformed = vec3(NormalMatrix * vec4(normal,0.0));",
+            "  dotComputed = max(0.0, dot(normalTransformed, vec3(0,0,1)));",
+            "  if (dotComputed > 0.001) {",
+            "     dotComputed = 1.0;",
+            "  }",
+            "  gl_Position = ProjectionMatrix * ModelViewMatrix * vec4(Vertex, 1);",
+            "}",
+            ""
+        ].join('\n');
+
+        var fragmentshader = [
+            "",
+            "#ifdef GL_ES",
+            "precision highp float;",
+            "#endif",
+            "uniform sampler2D Texture0;",
+            "uniform vec4 fragColor;",
+            "uniform float scale;",
+            "varying float dotComputed;",
+            "varying vec2 TexCoordFragment;",
+            "void main(void) {",
+            "  vec4 color = texture2D( Texture0, TexCoordFragment.xy);",
+            "gl_FragColor = fragColor * min(2.0*dotComputed * color.x, 0.999999);",
+            "}",
+            ""
+        ].join('\n');
+
+        var program = osg.Program.create(
+            osg.Shader.create(gl.VERTEX_SHADER, vertexshader),
+            osg.Shader.create(gl.FRAGMENT_SHADER, fragmentshader));
+        var stateset = new osg.StateSet();
+        var uniform = osg.Uniform.createFloat4(this.waveColor,"fragColor");
+        var scale = osg.Uniform.createFloat1(scale,"scale");
+        var uniformTexture = osg.Uniform.createInt1(0, "Texture0");
+        stateset.setAttributeAndMode(program);
+        stateset.setAttributeAndMode(new osg.LineWidth(1.0));
+        stateset.addUniform(uniform);
+        stateset.addUniform(uniformTexture);
+        stateset.addUniform(scale);
+        return stateset;
+    },
+    getWave: function()  {
+        if (this.wave === undefined) {
+            var Wave = function() {
+                this.buffers = [];
+                this.buffers.push(document.getElementById("HeightMap1"));
+                this.buffers.push(document.getElementById("HeightMap2"));
+                this.currentBuffer = 0;
+                var prevCtx = this.buffers[0].getContext("2d");
+                prevCtx.fillStyle = "rgb(0,0,0)";
+                prevCtx.fillRect(0,0, this.buffers[0].width,this.buffers[0].height);
+                var newCtx = this.buffers[1].getContext("2d");
+                newCtx.fillStyle = "rgb(0,0,0)";
+                newCtx.fillRect(0,0, this.buffers[0].width,this.buffers[0].height);
+
+                this.lastUpdate = undefined;
+                this.hitsList = [];
+
+                this.nb = 0;
+                this.duration = 0;
+            };
+            Wave.prototype = {
+                processHits: function(hits, prevImageData) {
+                    for (var h = 0, nbl = hits.length; h < nbl; h++) {
+                        var width = prevImageData.width;
+                        var pdata2 = prevImageData.data;
+                        coord = hits[h];
+                        var x = parseInt(Math.floor(coord[0]));
+                        var y = parseInt(Math.floor(coord[1]));
+                        var currentHeight = pdata2[(y * width + x ) * 4];
+                        currentHeight += 25;
+                        if (currentHeight > 255) {
+                            currentHeight = 255;
+                        }
+                        pdata2[(y * width + x ) * 4] = currentHeight;
+                    }
+                },
+                update: function() {
+                    var enter = (new Date()).getTime();
+                    var dt = 1.0/30.0;
+                    var currentTime = (new Date()).getTime()/1000.0;
+                    if (this.lastUpdate === undefined) {
+                        this.lastUpdate = currentTime;
+                    }
+                    var diff = currentTime-this.lastUpdate;
+                    if (diff < dt) {
+                        //osg.log("skip");
+                        return;
+                    }
+
+                    var nb = parseInt(Math.floor(diff/dt));
+                    for (var step = 0, l = nb; step < l; step++) {
+                        
+                        var prevBuffer = this.buffers[this.currentBuffer];
+                        var newBuffer = this.buffers[(this.currentBuffer+1)%2];
+
+                        var prevCtx = prevBuffer.getContext("2d");
+                        var newCtx = newBuffer.getContext("2d");
+                        
+                        var prevImageData = prevCtx.getImageData(0, 0, prevBuffer.width, prevBuffer.height);
+                        var newImageData = newCtx.getImageData(0, 0, prevBuffer.width, prevBuffer.height);
+
+                        var width = prevBuffer.width;
+                        var height = prevBuffer.height;
+
+                        var coord;
+                        var refresh = (this.hitsList.length > 0);
+                        if (refresh === true) {
+                            this.processHits(this.hitsList, prevImageData);
+                            prevCtx.putImageData(prevImageData, 0, 0);
+                            this.hitsList.length = 0;
+                        }
+
+                        for (var total = 0, w = width, h = height, totalIteration = width*height; total < totalIteration; total++) {
+                            
+                            var A = dt*dt*340.0/10.0;
+                            var B = 2.0-4.0*A;
+                            var damping = 0.996;
+                            
+                            var i = total%w;
+                            var j = Math.floor(total/w);
+
+                            var pdata = prevImageData.data;
+                            var ndata = newImageData.data;
+                            var up = pdata[(((j-1+h)%h) * w + i) * 4];
+                            var down = pdata[(((j+1)%h) * w + i) * 4];
+                            var left  = pdata[(j * w + (i-1+w)%w ) * 4];
+                            var right = pdata[(j * w + (i+1)%w ) * 4];
+                            var newvalue = A*(up+down+left+right) + B*pdata[(j * w + i ) * 4] - ndata[(j * w + i) * 4];
+                            newvalue *= damping;
+                            ndata[(j * w + i) * 4] = newvalue;
+                        }
+
+                        newCtx.putImageData(newImageData, 0, 0);
+                        this.swapbuffer();
+                    }
+                    this.lastUpdate += dt*nb;
+
+                    this.duration += (new Date()).getTime()-enter;
+                    this.nb +=1;
+                    if (this.lastDisplay === undefined) {
+                        this.lastDisplay = enter;
+                    }
+                    if (false && (enter - this.lastDisplay)/1000.0 > 2.0) {
+                        this.lastDisplay = enter;
+                        osg.log("average time in ms per iteration " + this.duration/this.nb);
+                    }
+                },
+
+                setLatLng: function(lat, lng) {
+                    var canvas = this.buffers[this.currentBuffer];
+                    lng = lng * canvas.width/360.0 + canvas.width/2.0;
+                    lat = -1.0 * lat * canvas.height/180.0 + canvas.height/2.0;
+                    this.hitsList.push([lng,lat]);
+                },
+
+                getCanvas: function() {
+                    return this.buffers[(this.currentBuffer+1)%2];
+                },
+
+                swapbuffer: function() {
+                    this.currentBuffer = (this.currentBuffer + 1)%2;
+                }
+            };
+            this.wave = new Wave();
+        }
+        return this.wave;
+    },
     addImage: function(latitude, longitude, image, options, cb) {
         var texture = new osg.Texture();
         texture.setMinFilter('LINEAR');
@@ -124,7 +371,9 @@ Globe.prototype = {
             this.ellipsoidModel = new osg.EllipsoidModel();
         }
 
-        var matrix = this.ellipsoidModel.computeLocalToWorldTransformFromLatLongHeight(latitude * Math.PI/180.0, longitude * Math.PI/180.0, 1000);
+        var lat = latitude * Math.PI/180.0;
+        var lng = longitude * Math.PI/180.0;
+        var matrix = this.ellipsoidModel.computeLocalToWorldTransformFromLatLongHeight(lat, lng, 1000);
         node.originalMatrix = osg.Matrix.copy(matrix);
         node.setMatrix(matrix);
         
@@ -145,6 +394,11 @@ Globe.prototype = {
                 this.parents[0].removeChildren(this);
             }
         };
+
+        if (this.wave !== undefined) {
+            this.wave.setLatLng(latitude, longitude);
+        }
+
         return node;
     },
     dispose: function() {
@@ -436,6 +690,58 @@ Globe.prototype = {
         };
 
         viewer.manipulator.update(-2.0, 0);
+        if (this.wave !== undefined) {
+            var that = this;
+            var getWaveShader = function() { return that.getWaveShaderVolume() };
+            var numTexturesAvailableInVertexShader = gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS);
+            osg.log("Nb Texture Unit in vertex shader " + numTexturesAvailableInVertexShader);
+            if (numTexturesAvailableInVertexShader < 1) {
+                osg.log("VolumeWave disabled because your OpenGL implementation has " + numTexturesAvailableInVertexShader + " vertex texture units and wave option require at least 1");
+                getWaveShader = function() { return that.getWaveShaderFlat() };
+            }
+            
+
+            var UpdateWaveCallback = function() {
+                this.rate = 1.0/30.0; // update per second
+            };
+            UpdateWaveCallback.prototype = {
+                setUniformScale: function(uniform) {
+                    this.scale = uniform;
+                },
+                setTexture: function(texture) {
+                    this.texture = texture;
+                },
+                getHeightMapCanvas: function() {
+                    if (this.canvas === undefined) {
+                        this.canvas = document.getElementById("HeightMap1");
+                    }
+                    return this.canvas;
+                },
+                update: function(node, nv) {
+                    var scale = viewer.getManipulator().scale*25.0;
+                    this.scale.set([scale]);
+                    //osg.log("scale " + scale);
+                    if (that.wave !== undefined) {
+                        that.wave.update();
+                        this.texture.setFromCanvas(that.wave.getCanvas());
+                    }
+                    node.traverse(nv);
+                }
+            };
+
+            var height = osg.ParseSceneGraph(getHeight());
+            var heightStateSet = getWaveShader();
+            height.setStateSet(heightStateSet);
+            var heightTexture = new osg.Texture();
+            heightStateSet.setTextureAttributeAndMode(0, heightTexture);
+            var heightUpdateCallback = new UpdateWaveCallback();
+            heightUpdateCallback.setUniformScale(heightStateSet.getUniformMap()['scale']);
+            heightUpdateCallback.setTexture(heightTexture);
+            height.setUpdateCallback(heightUpdateCallback);
+            heightStateSet.setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
+            heightStateSet.setAttributeAndMode(new osg.Depth('DISABLE'));
+            scene.addChild(height);
+        }
 
         return { root: scene, items: items};
     }

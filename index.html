@@ -15,6 +15,7 @@
 <script type="text/javascript" src="js/globe.js"></script>
 
 <script type="text/javascript" src="js/world.js"></script>
+<script type="text/javascript" src="js/height.js"></script>
 <script type="text/javascript" src="js/country.js"></script>
 <script type="text/javascript" src="js/coast.js"></script>
 
@@ -29,7 +30,8 @@ window.addEventListener("load", function() {
        height:996,
 
        rotationIdleSpeedFactor: 10.0,
-       rotationSpeedFactor: 1.5
+       rotationSpeedFactor: 1.5,
+       wave: false
     };
 
     var globe = new Globe(document.getElementById("3DView"),options);
@@ -38,7 +40,7 @@ window.addEventListener("load", function() {
     var items = [];
     img.onload = function() {
 
-       # basic test usage
+       // basic test usage
        globe.addImage(48.8566667, 2.3509871, img);
        globe.addImage(48.8566667, 2.3509871, img);
        globe.addImage(48.8566667, 2.3509871, img);
@@ -83,6 +85,10 @@ window.addEventListener("load", function() {
 <div id="ViewContainer">
 <canvas id="3DView" width="800" height="600"></canvas>
 </div>
+
+<canvas id="HeightMap1" width="128" height="64" style="display: none;"> </canvas>
+<canvas id="HeightMap2" width="128" height="64" style="display: none;"> </canvas>
+
 </div>
 
 </body>
