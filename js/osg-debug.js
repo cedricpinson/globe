@@ -2627,7 +2627,7 @@ osg.EllipsoidModel.prototype = {
     },
     computeLocalToWorldTransformFromLatLongHeight : function(latitude, longitude, height) {
         var pos = this.convertLatLongHeightToXYZ(latitude, longitude, height);
-        var m = osg.Matrix.makeTranslate(pos[0], pos[1], pos[2]);
+        var m = osg.Matrix.makeTranslate(pos[0], pos[1], pos[2], []);
         this.computeCoordinateFrame(latitude, longitude, m);
         return m;
     },
