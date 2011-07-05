@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    overflow:hidden;
+    margin:0;
+    padding:0;
+  }
+</style>
+
+<title>Globe</title>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+<script type="text/javascript" src="js/osg.js"></script>
+<script type="text/javascript" src="js/globe.js"></script>
+<script type="text/javascript" src="js/world.js"></script>
+<script type="text/javascript" src="js/height.js"></script>
+<script type="text/javascript" src="js/country.js"></script>
+<script type="text/javascript" src="js/coast.js"></script>
+
+<script type="text/javascript">
+window.addEventListener("load", function() {
+    var options = {
+       globeBackColor: "#333333FF",
+       globeFrontColor: "#888888aa",
+       globeLinesColor: "#000000FF",
+
+       width:1920,
+       height:996,
+
+       rotationIdleSpeedFactor: 10.0,
+       rotationSpeedFactor: 1.5,
+       wave: false
+    };
+
+    var globe = new Globe(document.getElementById("3DView"),options);
+
+    var img = new Image();
+    var items = [];
+    img.onload = function() {
+
+       // basic test usage
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+       globe.addImage(48.8566667, 2.3509871, img);
+
+       // check it's in the tree
+       if (globe.items.children.length !== 7) {
+          alert("Should be 7, and is " + globe.items.children.length);
+       }
+       globe.dispose();
+       if (globe.items.children.length !== 0) {
+          alert("Should be 0, and is " + globe.items.children.length);
+       }
+
+       items.push(globe.addImage(48.8566667, 2.3509871, img));
+       // check it's in the tree
+       if (globe.items.children.length !== 1) {
+          alert("Should be 1, and is " + globe.items.children.length);
+       }
+       items[0].dispose();
+       // check it's not in the tree
+       if (globe.items.children.length !== 0) {
+          alert("Should be 0, and is " + globe.items.children.length);
+       }
+    };
+    img.src = "item.png";
+
+    window.setInterval(function() {
+          globe.addImage(48.8566667, 2.3509871, img, { color: [ 1.0, 0.2, 1.0, 0.4] }, function() { osg.log("Hit itemID " + this.itemID ); } );
+       }, 5000);
+
+},true);
+
+</script>
+</head>
+
+<body>
+
+<div id="ViewContainer">
+<canvas id="3DView" width="800" height="600"></canvas>
+</div>
+
+<canvas id="HeightMap1" width="128" height="64" style="display: none;"> </canvas>
+<canvas id="HeightMap2" width="128" height="64" style="display: none;"> </canvas>
+
+</div>
+
+</body>
+</html>
