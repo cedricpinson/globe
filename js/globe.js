@@ -88,12 +88,7 @@ var Globe = function(canvas, options)
                 this.scene = new osg.Node();
             }
             this.view.addChild(this.scene);
-            var that = this;
-            var render = function() {
-                window.requestAnimationFrame(render, that.canvas);
-                that.frame();
-            };
-            render();
+            osgViewer.Viewer.prototype.run.call(this);
         };
 
         var result = this.createScene();
@@ -370,14 +365,14 @@ Globe.prototype = {
 
         var uniform = osg.Uniform.createInt1(0.0, "Texture0");
         geom.setStateSet(stateSet);
-        node.uniform = stateSet.getUniformMap()['fragColor'];
+        node.uniform = stateSet.getUniform('fragColor');
 
         node.setUpdateCallback(this.getItemUpdateCallback());
         node.itemType = "Item";
 
         if (options !== undefined) {
             if (options.color !== undefined) {
-                var baseColor = stateSet.getUniformMap()['baseColor'];
+                var baseColor = stateSet.getUniform('baseColor');
                 baseColor.set(options.color);
             }
         }
@@ -571,7 +566,7 @@ Globe.prototype = {
                             var rr = 1.0 - (this.manipulator.height-this.limit) * 0.8/(2.5*osg.WGS_84_RADIUS_EQUATOR-this.limit);
                             scale *= rr;
                         }
-                        node.setMatrix(osg.Matrix.mult(node.originalMatrix, osg.Matrix.makeScale(scale, scale, scale)));
+                        node.setMatrix(osg.Matrix.mult(node.originalMatrix, osg.Matrix.makeScale(scale, scale, scale), []));
                     }
 
                     var value = (1.0 - osgAnimation.EaseInQuad(ratio));
@@ -668,9 +663,9 @@ Globe.prototype = {
 
         var scene = new osg.Node();
 
-        var world = osg.ParseSceneGraph(getWorld());
-        var country = osg.ParseSceneGraph(getCountry());
-        var coast = osg.ParseSceneGraph(getCoast());
+        var world = osgDB.parseSceneGraph(getWorld());
+        var country = osgDB.parseSceneGraph(getCountry());
+        var coast = osgDB.parseSceneGraph(getCoast());
 
         var backSphere = new osg.Node();
         backSphere.addChild(world);
@@ -685,7 +680,7 @@ Globe.prototype = {
         frontSphere.setStateSet(this.getWorldShaderFront());
         frontSphere.setNodeMask(2);
         frontSphere.getOrCreateStateSet().setAttributeAndMode(new osg.CullFace('BACK'));
-        frontSphere.getOrCreateStateSet().getUniformMap()['fragColor'].set(this.landFrontColor);
+        frontSphere.getOrCreateStateSet().getUniform('fragColor').set(this.landFrontColor);
 
         country.addChild(coast);
 
@@ -758,7 +753,7 @@ Globe.prototype = {
             var heightTexture = new osg.Texture();
             heightStateSet.setTextureAttributeAndMode(0, heightTexture);
             var heightUpdateCallback = new UpdateWaveCallback();
-            heightUpdateCallback.setUniformScale(heightStateSet.getUniformMap()['scale']);
+            heightUpdateCallback.setUniformScale(heightStateSet.getUniform('scale'));
             heightUpdateCallback.setTexture(heightTexture);
             height.setUpdateCallback(heightUpdateCallback);
             heightStateSet.setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
@@ -854,15 +849,15 @@ osgGA.GlobeManipulator.prototype = {
         var scale = 1.0/10.0;
         scale = this.scale;
 
-        var of = osg.Matrix.makeRotate(dx * scale, 0,0,1);
-        var r = osg.Matrix.mult(this.rotation, of);
+        var of = osg.Matrix.makeRotate(dx * scale, 0,0,1, []);
+        var r = osg.Matrix.mult(this.rotation, of, []);
 
-        of = osg.Matrix.makeRotate(dy * scale/2.0, 1,0,0);
-        var r2 = osg.Matrix.mult(of,r);
+        of = osg.Matrix.makeRotate(dy * scale/2.0, 1,0,0, []);
+        var r2 = osg.Matrix.mult(of,r, []);
 
         // test that the eye is not too up and not too down to not kill
         // the rotation matrix
-        var eye = osg.Matrix.transformVec3(osg.Matrix.inverse(r2), [0, 0, this.distance]);
+        var eye = osg.Matrix.transformVec3(osg.Matrix.inverse(r2, []), [0, 0, this.distance], []);
         if (eye[2] > 0.99*this.distance || eye[2] < -0.99*this.distance) {
             //discard rotation on y
             this.rotation = r;
@@ -875,8 +870,8 @@ osgGA.GlobeManipulator.prototype = {
     goToLocation: function(lat, lng) {
         // already running switch to new location
         var pos3d = this.ellipsoidModel.convertLatLongHeightToXYZ(lat*Math.PI/180.0, lng*Math.PI/180.0);
-        var lookat = osg.Matrix.makeLookAt(pos3d, [0,0,0], [0,0,-1]);
-        var q = osg.Matrix.getRotate(lookat);
+        var lookat = osg.Matrix.makeLookAt(pos3d, [0,0,0], [0,0,-1], []);
+        var q = osg.Matrix.getRotate(lookat, []);
 
         if (this.goToLocationRunning) {
             var qStart = this.getGoToLocationQuaternion();
@@ -1118,6 +1113,18 @@ osgGA.GlobeManipulator.prototype = {
         //osg.log("height " + llh[2] + " distance " + this.distance);
     },
 
+    mousewheel: function(ev, intDelta, deltaX, deltaY) {
+	if (intDelta > 0){
+            if (this.distanceDecrease) {
+                this.distanceDecrease();
+            }
+	}
+	else if (intDelta < 0){
+            if (this.distanceIncrease) {
+                this.distanceIncrease();
+            }
+	}
+    },
     distanceIncrease: function() {
         var h = this.height;
         var currentTarget = this.targetDistance;
@@ -1214,7 +1221,7 @@ osgGA.GlobeManipulator.prototype = {
             var qCurrent = this.getGoToLocationQuaternion();
             eye = osg.Matrix.transformVec3(osg.Matrix.makeRotateFromQuat(qCurrent), [0, 0, distance]);
             this.eye = eye;
-            inv = osg.Matrix.makeLookAt(osg.Vec3.add(target,eye), target, [0,0,1]);
+            inv = osg.Matrix.makeLookAt(osg.Vec3.add(target,eye), target, [0,0,1], []);
 
         } else {
 
@@ -1250,7 +1257,7 @@ osgGA.GlobeManipulator.prototype = {
             //this.targetMotion
             eye = osg.Matrix.transformVec3(osg.Matrix.inverse(this.rotation), [0, 0, distance]);
             this.eye = eye;
-            inv = osg.Matrix.makeLookAt(osg.Vec3.add(target,eye), target, [0,0,1]);
+            inv = osg.Matrix.makeLookAt(osg.Vec3.add(target,eye, []), target, [0,0,1], []);
         }
 
         this.height = this.getHeight();
