@@ -11,5 +11,4 @@ You can instanciate it like that:
 
     var globe = new Globe(canvas,options);
 
-
-<a href="http://cedricpinson.github.com/globe/">Have a try</a>
+[ Test Me ](http://cedricpinson.github.com/globe/)
