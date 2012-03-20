@@ -72,32 +72,28 @@ var Globe = function(canvas, options)
     canvas.height = h;
     var ratio = canvas.width/canvas.height;
 
-    try {
+//    try {
         this.viewer = new osgViewer.Viewer(canvas);
         this.viewer.init();
         var manipulator = new osgGA.GlobeManipulator(options);
         this.viewer.setupManipulator(manipulator);
 
-        this.viewer.view.setProjectionMatrix(osg.Matrix.makePerspective(60, ratio, 1000.0, 100000000.0));
-        this.viewer.manipulator.setDistance(2.5*6378137);
-        this.viewer.manipulator.setMaxDistance(2.5*6378137);
-        this.viewer.manipulator.setMinDistance(6378137);
+        this.viewer.getCamera().setProjectionMatrix(osg.Matrix.makePerspective(60, ratio, 1000.0, 100000000.0, []));
+        this.viewer.getManipulator().setDistance(2.5*6378137);
+        this.viewer.getManipulator().setMaxDistance(2.5*6378137);
+        this.viewer.getManipulator().setMinDistance(6378137);
 
         this.viewer.run = function() {
-            if (this.scene === undefined) {
-                this.scene = new osg.Node();
-            }
-            this.view.addChild(this.scene);
             osgViewer.Viewer.prototype.run.call(this);
         };
 
         var result = this.createScene();
         this.items = result.items;
-        this.viewer.setScene(result.root);
+        this.viewer.setSceneData(result.root);
         this.viewer.run();
-    } catch (er) {
-        osg.log("exception in osgViewer " + er);
-    }
+//    } catch (er) {
+//        osg.log("exception in osgViewer " + er);
+//    }
 
 };
 
@@ -655,7 +651,7 @@ Globe.prototype = {
             return vars;
         };
 
-        viewer.view.setClearColor([0,0,0,0]);
+        viewer.getCamera().setClearColor([0,0,0,0]);
 
 
         var canvas = this.canvas;
@@ -688,6 +684,7 @@ Globe.prototype = {
         scene.addChild(backSphere);
         scene.addChild(frontSphere);
         scene.addChild(country);
+
         var items = new osg.Node();
         scene.addChild(items);
         items.getOrCreateStateSet().setAttributeAndMode(new osg.Depth('DISABLE'));
@@ -702,12 +699,12 @@ Globe.prototype = {
 
         var createGoToLocation = function(location) {
             var f = function(event) {
-                viewer.manipulator.goToLocation(location.lat, location.lng);
+                viewer.getManipulator().goToLocation(location.lat, location.lng);
             };
             return f;
         };
 
-        viewer.manipulator.update(-2.0, 0);
+        viewer.getManipulator().update(-2.0, 0);
         if (this.wave !== undefined) {
             var that = this;
             var getWaveShader = function() { return that.getWaveShaderVolume() };
@@ -767,6 +764,8 @@ Globe.prototype = {
 
 
 osgGA.GlobeManipulator = function (options) {
+    osgGA.Manipulator.call(this);
+
     this.ellipsoidModel = new osg.EllipsoidModel();
     this.distance = 25;
     this.target = [ 0,0, 0];
@@ -817,7 +816,7 @@ osgGA.GlobeManipulator = function (options) {
 
 };
 
-osgGA.GlobeManipulator.prototype = {
+osgGA.GlobeManipulator.prototype = osg.objectInehrit(osgGA.Manipulator.prototype, {
     panModel: function(dx, dy) {
 
         var inv = osg.Matrix.inverse(this.rotation);
@@ -986,7 +985,8 @@ osgGA.GlobeManipulator.prototype = {
         var curY;
         var deltaX;
         var deltaY;
-        var pos = this.convertEventToCanvas(ev);
+        var pos = this.getPositionRelativeToCanvas(ev);
+
         curX = pos[0];
         curY = pos[1];
 
@@ -1003,7 +1003,7 @@ osgGA.GlobeManipulator.prototype = {
         this.update(deltaX, deltaY);
     },
     mousedown: function(ev) {
-        var pos = this.convertEventToCanvas(ev);
+        var pos = this.getPositionRelativeToCanvas(ev);
         this.clientX = pos[0];
         this.clientY = pos[1];
         this.pushButton();
@@ -1255,7 +1255,13 @@ osgGA.GlobeManipulator.prototype = {
             }
             
             //this.targetMotion
-            eye = osg.Matrix.transformVec3(osg.Matrix.inverse(this.rotation), [0, 0, distance]);
+            var tmpInv = osg.Matrix._mytmp;
+            if (tmpInv === undefined) {
+                tmpInv = new Array(16);
+                osg.Matrix._mytmp = tmpInv;
+            }
+            var success = osg.Matrix.inverse(this.rotation, tmpInv);
+            eye = osg.Matrix.transformVec3(tmpInv, [0, 0, distance], []);
             this.eye = eye;
             inv = osg.Matrix.makeLookAt(osg.Vec3.add(target,eye, []), target, [0,0,1], []);
         }
@@ -1266,5 +1272,5 @@ osgGA.GlobeManipulator.prototype = {
         return inv;
     }
 
-};
+});
 
