@@ -411,24 +411,6 @@ Globe.prototype = {
             this.items.getChildren()[0].dispose();
         }
     },
-    getWindowSize: function() {
-        var myWidth = 0, myHeight = 0;
-        
-        if( typeof( window.innerWidth ) == 'number' ) {
-            //Non-IE
-            myWidth = window.innerWidth;
-            myHeight = window.innerHeight;
-        } else if( document.documentElement && ( document.documentElement.clientWidth || document.documentElement.clientHeight ) ) {
-            //IE 6+ in 'standards compliant mode'
-            myWidth = document.documentElement.clientWidth;
-            myHeight = document.documentElement.clientHeight;
-        } else if( document.body && ( document.body.clientWidth || document.body.clientHeight ) ) {
-            //IE 4 compatible
-            myWidth = document.body.clientWidth;
-            myHeight = document.body.clientHeight;
-        }
-        return { 'w': myWidth, 'h': myHeight };
-    },
 
     getWorldProgram: function() {
         if (this.WorldProgram === undefined) {
@@ -677,22 +659,29 @@ Globe.prototype = {
 
         country.addChild(coast);
 
+        var countryScale = new osg.MatrixTransform();
+        osg.Matrix.makeScale(1.001,1.001,1.001, countryScale.getMatrix());
+        countryScale.addChild(country);
+
 
         scene.addChild(backSphere);
         scene.addChild(frontSphere);
-        scene.addChild(country);
+        scene.addChild(countryScale);
 
         var items = new osg.Node();
         scene.addChild(items);
         items.getOrCreateStateSet().setAttributeAndMode(new osg.Depth('DISABLE'));
-        items.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
+        items.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('SRC_ALPHA', 'ONE_MINUS_SRC_ALPHA'));
 
-        backSphere.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
-        frontSphere.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
+        backSphere.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('SRC_ALPHA', 'ONE_MINUS_SRC_ALPHA'));
+        frontSphere.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('SRC_ALPHA', 'ONE_MINUS_SRC_ALPHA'));
 
         country.setStateSet(this.getCountryShader());
         //    country.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE'));
-        country.getOrCreateStateSet().setAttributeAndMode(new osg.Depth('ALWAYS', 0, 1.0, false));
+        //coast.getOrCreateStateSet().setAttributeAndMode(new osg.Depth());
+        //frontSphere.getOrCreateStateSet().setAttributeAndMode(new osg.Depth('ALWAYS', 0, 1.0, false));
+        //scene.getOrCreateStateSet().setAttributeAndMode(new osg.Depth());
+        //country.getOrCreateStateSet().setAttributeAndMode(new osg.Depth(osg.Depth.LEQUAL, 0, 1.0, false));
 
         var createGoToLocation = function(location) {
             var f = function(event) {
