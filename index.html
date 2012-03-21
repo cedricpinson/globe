@@ -6,7 +6,25 @@
     overflow:hidden;
     margin:0;
     padding:0;
+  background: rgb(76,76,76);
+  overflow:hidden;
+  padding:0;
+  margin:0;
+  color: white;
   }
+
+  .vignette {
+  -moz-box-shadow: inset 0px 0px 88px rgba(0,0,0,1.0);
+  -webkit-box-shadow: inset 0px 0px 88px rgba(0,0,0,1.0);
+  box-shadow: inset 0px 0px 88px rgba(0,0,0,1.0);
+  }
+
+  a:link {text-decoration: none; color: black;}
+  a:visited {text-decoration: none; color: black;}
+  a:active {text-decoration: none; color: black;}
+  a:hover {text-decoration: underline;  color: black;}
+
+
 </style>
 
 <title>Globe</title>
@@ -25,8 +43,8 @@ window.addEventListener("load", function() {
        globeFrontColor: "#888888aa",
        globeLinesColor: "#000000FF",
 
-       width:1920,
-       height:996,
+//       width:1920,
+//       height:996,
 
        rotationIdleSpeedFactor: 10.0,
        rotationSpeedFactor: 1.5,
@@ -79,10 +97,10 @@ window.addEventListener("load", function() {
 </script>
 </head>
 
-<body>
+<body  class="vignette">
 
 <div id="ViewContainer">
-<canvas id="3DView" width="800" height="600"></canvas>
+<canvas id="3DView"></canvas>
 </div>
 
 <canvas id="HeightMap1" width="128" height="64" style="display: none;"> </canvas>

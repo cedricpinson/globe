@@ -13,11 +13,11 @@ var Globe = function(canvas, options)
         var k = 0;
         var int1,int2;
         for(var i=0;i<8;i+=2) {
-	    int1 = hex_alphabets.indexOf(hex.charAt(i));
-	    int2 = hex_alphabets.indexOf(hex.charAt(i+1)); 
-	    value[k] = (int1 * 16) + int2;
+            int1 = hex_alphabets.indexOf(hex.charAt(i));
+            int2 = hex_alphabets.indexOf(hex.charAt(i+1)); 
+            value[k] = (int1 * 16) + int2;
             value[k] = value[k]/255.0;
-	    k++;
+            k++;
         }
         return(value);
     };
@@ -29,8 +29,6 @@ var Globe = function(canvas, options)
     this.waveColor = hex2num("#000000FF");
 
     var w,h;
-    w = canvas.width;
-    h = canvas.height;
     if (options !== undefined) {
         if (options.globeBackColor !== undefined) {
             this.landColor = hex2num(options.globeBackColor);
@@ -62,9 +60,8 @@ var Globe = function(canvas, options)
 
     
     if (w === undefined || h === undefined) {
-        var size = this.getWindowSize();
-        w = size.w;
-        h = size.h;
+        w = window.innerWidth;
+        h = window.innerHeight;
     }
 
     this.canvas = canvas;
@@ -236,8 +233,8 @@ Globe.prototype = {
                         var width = prevImageData.width;
                         var pdata2 = prevImageData.data;
                         coord = hits[h];
-                        var x = parseInt(Math.floor(coord[0]));
-                        var y = parseInt(Math.floor(coord[1]));
+                        var x = parseInt(Math.floor(coord[0]),10);
+                        var y = parseInt(Math.floor(coord[1]),10);
                         var currentHeight = pdata2[(y * width + x ) * 4];
                         currentHeight += 25;
                         if (currentHeight > 255) {
@@ -259,7 +256,7 @@ Globe.prototype = {
                         return;
                     }
 
-                    var nb = parseInt(Math.floor(diff/dt));
+                    var nb = parseInt(Math.floor(diff/dt),10);
                     for (var step = 0, l = nb; step < l; step++) {
                         
                         var prevBuffer = this.buffers[this.currentBuffer];
@@ -707,12 +704,12 @@ Globe.prototype = {
         viewer.getManipulator().update(-2.0, 0);
         if (this.wave !== undefined) {
             var that = this;
-            var getWaveShader = function() { return that.getWaveShaderVolume() };
+            var getWaveShader = function() { return that.getWaveShaderVolume(); };
             var numTexturesAvailableInVertexShader = gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS);
             osg.log("Nb Texture Unit in vertex shader " + numTexturesAvailableInVertexShader);
             if (numTexturesAvailableInVertexShader < 1) {
                 osg.log("VolumeWave disabled because your OpenGL implementation has " + numTexturesAvailableInVertexShader + " vertex texture units and wave option require at least 1");
-                getWaveShader = function() { return that.getWaveShaderFlat() };
+                getWaveShader = function() { return that.getWaveShaderFlat(); };
             }
             
 
@@ -1047,7 +1044,7 @@ osgGA.GlobeManipulator.prototype = osg.objectInehrit(osgGA.Manipulator.prototype
     touchMove: function(ev) {
         if (this.nbContacts === 2) {
             // zoom mode
-	    this.zoomModeUsed = true;
+            this.zoomModeUsed = true;
             if (this.contacts[0] === ev.streamId) {
                 if (this.contactsPosition[0] === undefined) {
                     this.contactsPosition[0] = {};
@@ -1069,26 +1066,26 @@ osgGA.GlobeManipulator.prototype = osg.objectInehrit(osgGA.Manipulator.prototype
             var y2 = this.contactsPosition[1].y;
             var dist = Math.sqrt( (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1) );
             var ratio = this.contactsIntialDistance/dist;
-	    //osg.log("2 cts " + ratio);
+
             this.contactsIntialDistance = dist;
             var h = this.height;
             //this.distance = this.targetDistance;
             this.targetDistance += (ratio - 1.0) * this.scale * 50.0* 6378137/2.0;
-	    if (this.maxDistance !== 0.0 && this.targetDistance > this.maxDistance) {
-		this.targetDistance = this.maxDistance;
-	    }
-	    if (this.minDistance !== 0.0 && this.targetDistance < this.minDistance) {
-		this.targetDistance = this.minDistance;
-	    }
-	    this.distance = this.targetDistance;
-	    //osg.log("target distance " + this.targetDistance);
+            if (this.maxDistance !== 0.0 && this.targetDistance > this.maxDistance) {
+                this.targetDistance = this.maxDistance;
+            }
+            if (this.minDistance !== 0.0 && this.targetDistance < this.minDistance) {
+                this.targetDistance = this.minDistance;
+            }
+            this.distance = this.targetDistance;
+            //osg.log("target distance " + this.targetDistance);
             this.timeMotion = (new Date()).getTime();
             
         } else {
             // rotation
-	    if (this.zoomModeUsed === false) {
-		this.mousemove(ev);
-	    }
+            if (this.zoomModeUsed === false) {
+                this.mousemove(ev);
+            }
         }
     },
 
