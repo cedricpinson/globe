@@ -13,11 +13,11 @@ var Globe = function(canvas, options)
         var k = 0;
         var int1,int2;
         for(var i=0;i<8;i+=2) {
-	    int1 = hex_alphabets.indexOf(hex.charAt(i));
-	    int2 = hex_alphabets.indexOf(hex.charAt(i+1)); 
-	    value[k] = (int1 * 16) + int2;
+            int1 = hex_alphabets.indexOf(hex.charAt(i));
+            int2 = hex_alphabets.indexOf(hex.charAt(i+1)); 
+            value[k] = (int1 * 16) + int2;
             value[k] = value[k]/255.0;
-	    k++;
+            k++;
         }
         return(value);
     };
@@ -29,8 +29,6 @@ var Globe = function(canvas, options)
     this.waveColor = hex2num("#000000FF");
 
     var w,h;
-    w = canvas.width;
-    h = canvas.height;
     if (options !== undefined) {
         if (options.globeBackColor !== undefined) {
             this.landColor = hex2num(options.globeBackColor);
@@ -62,9 +60,8 @@ var Globe = function(canvas, options)
 
     
     if (w === undefined || h === undefined) {
-        var size = this.getWindowSize();
-        w = size.w;
-        h = size.h;
+        w = window.innerWidth;
+        h = window.innerHeight;
     }
 
     this.canvas = canvas;
@@ -72,32 +69,28 @@ var Globe = function(canvas, options)
     canvas.height = h;
     var ratio = canvas.width/canvas.height;
 
-    try {
+//    try {
         this.viewer = new osgViewer.Viewer(canvas);
         this.viewer.init();
         var manipulator = new osgGA.GlobeManipulator(options);
         this.viewer.setupManipulator(manipulator);
 
-        this.viewer.view.setProjectionMatrix(osg.Matrix.makePerspective(60, ratio, 1000.0, 100000000.0));
-        this.viewer.manipulator.setDistance(2.5*6378137);
-        this.viewer.manipulator.setMaxDistance(2.5*6378137);
-        this.viewer.manipulator.setMinDistance(6378137);
+        this.viewer.getCamera().setProjectionMatrix(osg.Matrix.makePerspective(60, ratio, 1000.0, 100000000.0, []));
+        this.viewer.getManipulator().setDistance(2.5*6378137);
+        this.viewer.getManipulator().setMaxDistance(2.5*6378137);
+        this.viewer.getManipulator().setMinDistance(6378137);
 
         this.viewer.run = function() {
-            if (this.scene === undefined) {
-                this.scene = new osg.Node();
-            }
-            this.view.addChild(this.scene);
             osgViewer.Viewer.prototype.run.call(this);
         };
 
         var result = this.createScene();
         this.items = result.items;
-        this.viewer.setScene(result.root);
+        this.viewer.setSceneData(result.root);
         this.viewer.run();
-    } catch (er) {
-        osg.log("exception in osgViewer " + er);
-    }
+//    } catch (er) {
+//        osg.log("exception in osgViewer " + er);
+//    }
 
 };
 
@@ -240,8 +233,8 @@ Globe.prototype = {
                         var width = prevImageData.width;
                         var pdata2 = prevImageData.data;
                         coord = hits[h];
-                        var x = parseInt(Math.floor(coord[0]));
-                        var y = parseInt(Math.floor(coord[1]));
+                        var x = parseInt(Math.floor(coord[0]),10);
+                        var y = parseInt(Math.floor(coord[1]),10);
                         var currentHeight = pdata2[(y * width + x ) * 4];
                         currentHeight += 25;
                         if (currentHeight > 255) {
@@ -263,7 +256,7 @@ Globe.prototype = {
                         return;
                     }
 
-                    var nb = parseInt(Math.floor(diff/dt));
+                    var nb = parseInt(Math.floor(diff/dt),10);
                     for (var step = 0, l = nb; step < l; step++) {
                         
                         var prevBuffer = this.buffers[this.currentBuffer];
@@ -417,24 +410,6 @@ Globe.prototype = {
         while (this.items.getChildren().length > 0 ) {
             this.items.getChildren()[0].dispose();
         }
-    },
-    getWindowSize: function() {
-        var myWidth = 0, myHeight = 0;
-        
-        if( typeof( window.innerWidth ) == 'number' ) {
-            //Non-IE
-            myWidth = window.innerWidth;
-            myHeight = window.innerHeight;
-        } else if( document.documentElement && ( document.documentElement.clientWidth || document.documentElement.clientHeight ) ) {
-            //IE 6+ in 'standards compliant mode'
-            myWidth = document.documentElement.clientWidth;
-            myHeight = document.documentElement.clientHeight;
-        } else if( document.body && ( document.body.clientWidth || document.body.clientHeight ) ) {
-            //IE 4 compatible
-            myWidth = document.body.clientWidth;
-            myHeight = document.body.clientHeight;
-        }
-        return { 'w': myWidth, 'h': myHeight };
     },
 
     getWorldProgram: function() {
@@ -655,7 +630,7 @@ Globe.prototype = {
             return vars;
         };
 
-        viewer.view.setClearColor([0,0,0,0]);
+        viewer.getCamera().setClearColor([0,0,0,0]);
 
 
         var canvas = this.canvas;
@@ -684,38 +659,46 @@ Globe.prototype = {
 
         country.addChild(coast);
 
+        var countryScale = new osg.MatrixTransform();
+        osg.Matrix.makeScale(1.001,1.001,1.001, countryScale.getMatrix());
+        countryScale.addChild(country);
+
 
         scene.addChild(backSphere);
         scene.addChild(frontSphere);
-        scene.addChild(country);
+        scene.addChild(countryScale);
+
         var items = new osg.Node();
         scene.addChild(items);
         items.getOrCreateStateSet().setAttributeAndMode(new osg.Depth('DISABLE'));
-        items.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
+        items.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('SRC_ALPHA', 'ONE_MINUS_SRC_ALPHA'));
 
-        backSphere.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
-        frontSphere.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE_MINUS_SRC_ALPHA'));
+        backSphere.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('SRC_ALPHA', 'ONE_MINUS_SRC_ALPHA'));
+        frontSphere.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('SRC_ALPHA', 'ONE_MINUS_SRC_ALPHA'));
 
         country.setStateSet(this.getCountryShader());
         //    country.getOrCreateStateSet().setAttributeAndMode(new osg.BlendFunc('ONE', 'ONE'));
-        country.getOrCreateStateSet().setAttributeAndMode(new osg.Depth('ALWAYS', 0, 1.0, false));
+        //coast.getOrCreateStateSet().setAttributeAndMode(new osg.Depth());
+        //frontSphere.getOrCreateStateSet().setAttributeAndMode(new osg.Depth('ALWAYS', 0, 1.0, false));
+        //scene.getOrCreateStateSet().setAttributeAndMode(new osg.Depth());
+        //country.getOrCreateStateSet().setAttributeAndMode(new osg.Depth(osg.Depth.LEQUAL, 0, 1.0, false));
 
         var createGoToLocation = function(location) {
             var f = function(event) {
-                viewer.manipulator.goToLocation(location.lat, location.lng);
+                viewer.getManipulator().goToLocation(location.lat, location.lng);
             };
             return f;
         };
 
-        viewer.manipulator.update(-2.0, 0);
+        viewer.getManipulator().update(-2.0, 0);
         if (this.wave !== undefined) {
             var that = this;
-            var getWaveShader = function() { return that.getWaveShaderVolume() };
+            var getWaveShader = function() { return that.getWaveShaderVolume(); };
             var numTexturesAvailableInVertexShader = gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS);
             osg.log("Nb Texture Unit in vertex shader " + numTexturesAvailableInVertexShader);
             if (numTexturesAvailableInVertexShader < 1) {
                 osg.log("VolumeWave disabled because your OpenGL implementation has " + numTexturesAvailableInVertexShader + " vertex texture units and wave option require at least 1");
-                getWaveShader = function() { return that.getWaveShaderFlat() };
+                getWaveShader = function() { return that.getWaveShaderFlat(); };
             }
             
 
@@ -767,6 +750,8 @@ Globe.prototype = {
 
 
 osgGA.GlobeManipulator = function (options) {
+    osgGA.Manipulator.call(this);
+
     this.ellipsoidModel = new osg.EllipsoidModel();
     this.distance = 25;
     this.target = [ 0,0, 0];
@@ -817,7 +802,7 @@ osgGA.GlobeManipulator = function (options) {
 
 };
 
-osgGA.GlobeManipulator.prototype = {
+osgGA.GlobeManipulator.prototype = osg.objectInehrit(osgGA.Manipulator.prototype, {
     panModel: function(dx, dy) {
 
         var inv = osg.Matrix.inverse(this.rotation);
@@ -986,7 +971,8 @@ osgGA.GlobeManipulator.prototype = {
         var curY;
         var deltaX;
         var deltaY;
-        var pos = this.convertEventToCanvas(ev);
+        var pos = this.getPositionRelativeToCanvas(ev);
+
         curX = pos[0];
         curY = pos[1];
 
@@ -1003,7 +989,7 @@ osgGA.GlobeManipulator.prototype = {
         this.update(deltaX, deltaY);
     },
     mousedown: function(ev) {
-        var pos = this.convertEventToCanvas(ev);
+        var pos = this.getPositionRelativeToCanvas(ev);
         this.clientX = pos[0];
         this.clientY = pos[1];
         this.pushButton();
@@ -1047,7 +1033,7 @@ osgGA.GlobeManipulator.prototype = {
     touchMove: function(ev) {
         if (this.nbContacts === 2) {
             // zoom mode
-	    this.zoomModeUsed = true;
+            this.zoomModeUsed = true;
             if (this.contacts[0] === ev.streamId) {
                 if (this.contactsPosition[0] === undefined) {
                     this.contactsPosition[0] = {};
@@ -1069,26 +1055,26 @@ osgGA.GlobeManipulator.prototype = {
             var y2 = this.contactsPosition[1].y;
             var dist = Math.sqrt( (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1) );
             var ratio = this.contactsIntialDistance/dist;
-	    //osg.log("2 cts " + ratio);
+
             this.contactsIntialDistance = dist;
             var h = this.height;
             //this.distance = this.targetDistance;
             this.targetDistance += (ratio - 1.0) * this.scale * 50.0* 6378137/2.0;
-	    if (this.maxDistance !== 0.0 && this.targetDistance > this.maxDistance) {
-		this.targetDistance = this.maxDistance;
-	    }
-	    if (this.minDistance !== 0.0 && this.targetDistance < this.minDistance) {
-		this.targetDistance = this.minDistance;
-	    }
-	    this.distance = this.targetDistance;
-	    //osg.log("target distance " + this.targetDistance);
+            if (this.maxDistance !== 0.0 && this.targetDistance > this.maxDistance) {
+                this.targetDistance = this.maxDistance;
+            }
+            if (this.minDistance !== 0.0 && this.targetDistance < this.minDistance) {
+                this.targetDistance = this.minDistance;
+            }
+            this.distance = this.targetDistance;
+            //osg.log("target distance " + this.targetDistance);
             this.timeMotion = (new Date()).getTime();
             
         } else {
             // rotation
-	    if (this.zoomModeUsed === false) {
-		this.mousemove(ev);
-	    }
+            if (this.zoomModeUsed === false) {
+                this.mousemove(ev);
+            }
         }
     },
 
@@ -1255,7 +1241,13 @@ osgGA.GlobeManipulator.prototype = {
             }
             
             //this.targetMotion
-            eye = osg.Matrix.transformVec3(osg.Matrix.inverse(this.rotation), [0, 0, distance]);
+            var tmpInv = osg.Matrix._mytmp;
+            if (tmpInv === undefined) {
+                tmpInv = new Array(16);
+                osg.Matrix._mytmp = tmpInv;
+            }
+            var success = osg.Matrix.inverse(this.rotation, tmpInv);
+            eye = osg.Matrix.transformVec3(tmpInv, [0, 0, distance], []);
             this.eye = eye;
             inv = osg.Matrix.makeLookAt(osg.Vec3.add(target,eye, []), target, [0,0,1], []);
         }
@@ -1266,5 +1258,5 @@ osgGA.GlobeManipulator.prototype = {
         return inv;
     }
 
-};
+});
 

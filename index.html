@@ -6,12 +6,30 @@
     overflow:hidden;
     margin:0;
     padding:0;
+  background: rgb(44,44,44);
+  overflow:hidden;
+  padding:0;
+  margin:0;
+  color: white;
   }
+
+  .vignette {
+  -moz-box-shadow: inset 0px 0px 88px rgba(0,0,0,1.0);
+  -webkit-box-shadow: inset 0px 0px 88px rgba(0,0,0,1.0);
+  box-shadow: inset 0px 0px 88px rgba(0,0,0,1.0);
+  }
+
+  a:link {text-decoration: none; color: black;}
+  a:visited {text-decoration: none; color: black;}
+  a:active {text-decoration: none; color: black;}
+  a:hover {text-decoration: underline;  color: black;}
+
+
 </style>
 
 <title>Globe</title>
 <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
-<script type="text/javascript" src="js/osg.js"></script>
+<script type="text/javascript" src="js/osg-debug.js"></script>
 <script type="text/javascript" src="js/globe.js"></script>
 <script type="text/javascript" src="js/world.js"></script>
 <script type="text/javascript" src="js/height.js"></script>
@@ -21,12 +39,13 @@
 <script type="text/javascript">
 window.addEventListener("load", function() {
     var options = {
-       globeBackColor: "#333333FF",
-       globeFrontColor: "#888888aa",
-       globeLinesColor: "#000000FF",
+       //globeBackColor: "#73514F55",
+       globeBackColor: "#396A92aa",
+       globeFrontColor: "#9AB4CBbb",
+       globeLinesColor: "#00000044",
 
-       width:1920,
-       height:996,
+//       width:1920,
+//       height:996,
 
        rotationIdleSpeedFactor: 10.0,
        rotationSpeedFactor: 1.5,
@@ -79,10 +98,10 @@ window.addEventListener("load", function() {
 </script>
 </head>
 
-<body>
+<body  class="vignette">
 
 <div id="ViewContainer">
-<canvas id="3DView" width="800" height="600"></canvas>
+<canvas id="3DView"></canvas>
 </div>
 
 <canvas id="HeightMap1" width="128" height="64" style="display: none;"> </canvas>
